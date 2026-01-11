@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organizátor Receptov</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Body */
+body {
+  font-family: 'Courier New', Courier, monospace;
+  padding: 20px;
+  max-width: 900px;
+  margin: auto;
+  background: #0a0a0f; /* deep dark background */
+  color: #e0f7fa; /* softer cyan text for readability */
+}
+
+/* Titles */
+h1, h2, h3 {
+  text-align: center;
+  background: linear-gradient(90deg, #00fff0, #ff6fff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 5px rgba(0,255,255,0.6), 0 0 10px rgba(255,0,255,0.6);
+}
+
+/* Add-recipe & edit form cards */
+#add-recipe, .edit-form {
+  background: rgba(20, 20, 30, 0.95); /* slightly more opaque for readability */
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+  margin-bottom: 20px;
+  border: 1px solid #00fff0;
+  color: #e0f7fa; /* readable text color inside form */
+}
+
+/* Inputs and Textareas */
+input, textarea {
+  width: 100%;
+  margin: 5px 0;
+  padding: 10px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 2px solid #00fff0;
+  background: #11111a;
+  color: #e0f7fa;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+input:focus, textarea:focus {
+  outline: none;
+  border-color: #ff6fff;
+  box-shadow: 0 0 10px rgba(255,111,255,0.4), 0 0 5px rgba(0,255,255,0.4);
+}
+
+/* Recipe cards */
+li {
+  background: rgba(15,15,25,0.9);
+  margin: 10px 0;
+  padding: 15px;
+  border-radius: 12px;
+  border: 1px solid #00fff0;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(255, 111, 255, 0.5);
+}
+
+li div {
+  flex-grow: 1;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 16px;
+  color: #e0f7fa; /* readable inside cards */
+  text-shadow: 0 0 3px rgba(0,255,255,0.5);
+}
+
+/* Buttons */
+button {
+  padding: 8px 15px;
+  margin-left: 5px;
+  border: 2px solid #ff6fff;
+  border-radius: 8px;
+  background: #0a0a0f;
+  color: #ff6fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background: #ff6fff;
+  color: #0a0a0f;
+  box-shadow: 0 0 15px rgba(255,111,255,0.7), 0 0 30px rgba(0,255,255,0.4);
+}
+
+/* Edit overlay */
+.edit-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85); /* darker overlay for readability */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+  </style>
+</head>
+<body>
+  <h1>Organizátor Receptov</h1>
+  <section id="add-recipe">
+    <h2>Pridať Nový Recept</h2>
+    <input type="text" id="recipe-name" placeholder="Názov Receptu">
+    <textarea id="recipe-ingredients" placeholder="Ingrediencie (oddelené čiarkou)"></textarea>
+    <textarea id="recipe-steps" placeholder="Kroky"></textarea>
+    <button id="add-button">Pridať Recept</button>
+  </section>
+
+  <section id="recipe-list">
+    <h2>Recepty</h2>
+    <ul id="recipes"></ul>
+  </section>
+
+  <script>// Grab elements
+const addButton = document.getElementById('add-button');
+const recipesList = document.getElementById('recipes');
+
+let recipes = JSON.parse(localStorage.getItem('recipes')) || [];
+
+// Display recipes on page load
+displayRecipes();
+
+// Add new recipe
+addButton.addEventListener('click', () => {
+  const name = document.getElementById('recipe-name').value;
+  const ingredients = document.getElementById('recipe-ingredients').value;
+  const steps = document.getElementById('recipe-steps').value;
+
+  if (name && ingredients && steps) {
+    const recipe = { name, ingredients, steps };
+    recipes.push(recipe);
+    saveAndDisplay();
+    clearForm();
+  } else {
+    alert("Please fill all fields!");
+  }
+});
+
+// Functions
+function displayRecipes() {
+  recipesList.innerHTML = '';
+  recipes.forEach((recipe, index) => {
+    const li = document.createElement('li');
+    li.className = 'recipe-card';
+
+    // Header: name + toggle
+    const header = document.createElement('div');
+    header.className = 'recipe-header';
+
+    const title = document.createElement('div');
+    title.textContent = recipe.name;
+    title.className = 'recipe-title';
+
+    const toggle = document.createElement('button');
+    toggle.textContent = '▼';
+    toggle.className = 'toggle-button';
+
+    header.appendChild(title);
+    header.appendChild(toggle);
+
+    // Details container (hidden initially)
+    const details = document.createElement('div');
+    details.className = 'recipe-details';
+    details.style.display = 'none';
+    details.innerHTML = `
+      <p><strong>Ingredients:</strong> ${recipe.ingredients.replace(/,/g, ', ')}</p>
+      <p><strong>Steps:</strong> ${recipe.steps}</p>
+    `;
+
+    // Toggle functionality
+    toggle.addEventListener('click', () => {
+      if (details.style.display === 'none') {
+        details.style.display = 'block';
+        toggle.textContent = '▲';
+      } else {
+        details.style.display = 'none';
+        toggle.textContent = '▼';
+      }
+    });
+
+    // Buttons container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'button-container';
+
+    const editButton = document.createElement('button');
+    editButton.textContent = 'Edit';
+    editButton.addEventListener('click', () => editRecipe(index));
+
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'Delete';
+    deleteButton.addEventListener('click', () => deleteRecipe(index));
+
+    buttonContainer.appendChild(editButton);
+    buttonContainer.appendChild(deleteButton);
+
+    // Assemble card
+    li.appendChild(header);
+    li.appendChild(details);
+    li.appendChild(buttonContainer);
+
+    recipesList.appendChild(li);
+  });
+}
+
+
+
+
+
+function clearForm() {
+  document.getElementById('recipe-name').value = '';
+  document.getElementById('recipe-ingredients').value = '';
+  document.getElementById('recipe-steps').value = '';
+}
+
+function saveAndDisplay() {
+  localStorage.setItem('recipes', JSON.stringify(recipes));
+  displayRecipes();
+}
+
+// --- NEW: Custom edit window instead of prompt() ---
+function editRecipe(index) {
+  const recipe = recipes[index];
+
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'edit-overlay';
+
+  // Edit form HTML
+  overlay.innerHTML = `
+    <div class="edit-form">
+      <h3>Edit Recipe</h3>
+      <input type="text" id="edit-name" value="${recipe.name}">
+      <textarea id="edit-ingredients">${recipe.ingredients}</textarea>
+      <textarea id="edit-steps">${recipe.steps}</textarea>
+      <div style="text-align:right; margin-top:10px;">
+        <button id="save-edit">Save</button>
+        <button id="cancel-edit">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Save changes
+  document.getElementById('save-edit').addEventListener('click', () => {
+    const newName = document.getElementById('edit-name').value;
+    const newIngredients = document.getElementById('edit-ingredients').value;
+    const newSteps = document.getElementById('edit-steps').value;
+
+    if (newName && newIngredients && newSteps) {
+      recipes[index] = {
+        name: newName,
+        ingredients: newIngredients,
+        steps: newSteps
+      };
+      saveAndDisplay();
+      overlay.remove();
+    } else {
+      alert("Please fill all fields!");
+    }
+  });
+
+  // Cancel edit
+  document.getElementById('cancel-edit').addEventListener('click', () => {
+    overlay.remove();
+  });
+}
+
+function deleteRecipe(index) {
+  if (confirm(`Are you sure you want to delete "${recipes[index].name}"?`)) {
+    recipes.splice(index, 1);
+    saveAndDisplay();
+  }
+}
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
+</script>
+</body>
+</html>
